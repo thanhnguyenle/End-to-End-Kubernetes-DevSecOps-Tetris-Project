@@ -1,18 +1,21 @@
-# !/bin/bash
+#!/bin/bash
 # For Ubuntu 22.04
-# Intsalling Java
+# Installing Java
 sudo apt update
 sudo apt install fontconfig openjdk-21-jre -y
 java --version
 
-# Installing Jenkins
-sudo wget -O /etc/apt/keyrings/jenkins-keyring.asc \
-  https://pkg.jenkins.io/debian-stable/jenkins.io-2023.key
-echo "deb [signed-by=/etc/apt/keyrings/jenkins-keyring.asc]" \
-  https://pkg.jenkins.io/debian-stable binary/ | sudo tee \
-  /etc/apt/sources.list.d/jenkins.list > /dev/null
-sudo apt update
-sudo apt install jenkins -y
+# Installing Jenkins - FIXED
+# Add Jenkins GPG key (older key matching repo signature)
+sudo apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 7198F4B714ABFC68
+sudo apt-key export 7198F4B714ABFC68 | gpg --dearmor | tee /usr/share/keyrings/jenkins-keyring.gpg > /dev/null
+
+# Add Jenkins repo
+sudo echo "deb [signed-by=/usr/share/keyrings/jenkins-keyring.gpg] https://pkg.jenkins.io/debian-stable binary/" | tee /etc/apt/sources.list.d/jenkins.list > /dev/null
+
+# Install Jenkins
+sudo apt-get update
+sudo apt-get install -y jenkins
 
 # Installing Docker
 sudo apt update
@@ -27,7 +30,6 @@ sudo chmod 777 /var/run/docker.sock
 
 # Run Docker Container of Sonarqube
 docker run -d --name sonarqube -p 9000:9000 sonarqube:community
-
 
 # Installing Terraform
 sudo apt install unzip -y
@@ -45,8 +47,8 @@ sudo apt update
 sudo apt-get install terraform -y
 
 # Installing Kubectl
-curl -LO https://dl.k8s.io/release/v1.33.5/bin/linux/amd64/kubectl
-curl -LO https://dl.k8s.io/release/v1.33.5/bin/linux/amd64/kubectl.sha256
+curl -LO https://dl.k8s.io/release/v1.33.0/bin/linux/amd64/kubectl
+curl -LO https://dl.k8s.io/release/v1.33.0/bin/linux/amd64/kubectl.sha256
 echo "$(cat kubectl.sha256)  kubectl" | sha256sum --check
 sudo install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl
 kubectl version --client
@@ -57,9 +59,9 @@ unzip awscliv2.zip
 sudo ./aws/install
 
 # Installing Trivy
-sudo apt-get install wget gnupg
+sudo apt-get install wget gnupg -y
 wget -qO - https://aquasecurity.github.io/trivy-repo/deb/public.key | gpg --dearmor | sudo tee /usr/share/keyrings/trivy.gpg > /dev/null
 echo "deb [signed-by=/usr/share/keyrings/trivy.gpg] https://aquasecurity.github.io/trivy-repo/deb generic main" | sudo tee -a /etc/apt/sources.list.d/trivy.list
 sudo apt-get update
-sudo apt-get install trivy
+sudo apt-get install trivy -y
 trivy --version
