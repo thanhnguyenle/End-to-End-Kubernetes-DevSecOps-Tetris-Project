@@ -3,8 +3,8 @@ pipeline {
     tools {
         nodejs 'nodejs'
     }
-    environment  {
-        SCANNER_HOME=tool 'sonar-scanner'
+    environment {
+        SCANNER_HOME = tool 'sonar-scanner'
     }
     stages {
         stage('Cleaning Workspace') {
@@ -14,15 +14,18 @@ pipeline {
         }
         stage('Checkout from Git') {
             steps {
-                git branch: 'master', url: 'https://github.com/AmanPathak-DevOps/End-to-End-Kubernetes-DevSecOps-Tetris-Project.git'
+                git branch: 'master',
+                    credentialsId: 'githubkey',
+                    url: 'git@github.com:thanhnguyenle/End-to-End-Kubernetes-DevSecOps-Tetris-Project.git'
             }
         }
         stage('Sonarqube Analysis') {
             steps {
                 dir('Tetris-V1') {
-                    withSonarQubeEnv('sonar-scanner') {
-                        sh ''' $SCANNER_HOME/bin/sonar-scanner -Dsonar.projectName=Tetris \
-                        -Dsonar.projectKey=Tetris '''
+                    withSonarQubeEnv('SonarQube') {  // must match server name in Jenkins config
+                        sh ''' $SCANNER_HOME/bin/sonar-scanner \
+                            -Dsonar.projectName=Tetris \
+                            -Dsonar.projectKey=Tetris '''
                     }
                 }
             }
@@ -56,7 +59,7 @@ pipeline {
                 }
             }
         }
-        stage("Docker Image Build") {
+        stage('Docker Image Build') {
             steps {
                 script {
                     dir('Tetris-V1') {
@@ -68,44 +71,46 @@ pipeline {
                 }
             }
         }
-        stage("Docker Image Pushing") {
+        stage('Docker Image Pushing') {
             steps {
                 script {
                     withDockerRegistry(credentialsId: 'docker', toolName: 'docker') {
-                        sh 'docker tag tetrisv1 avian19/tetrisv1:${BUILD_NUMBER}'
-                        sh 'docker push avian19/tetrisv1:${BUILD_NUMBER}'
+                        sh 'docker tag tetrisv1 thanhnguyenle/tetrisv1:${BUILD_NUMBER}'
+                        sh 'docker push thanhnguyenle/tetrisv1:${BUILD_NUMBER}'
                     }
                 }
             }
         }
-        stage("TRIVY Image Scan") {
+        stage('TRIVY Image Scan') {
             steps {
-                sh 'trivy image avian19/tetrisv1:${BUILD_NUMBER} > trivyimage.txt'
+                sh 'trivy image thanhnguyenle/tetrisv1:${BUILD_NUMBER} > trivyimage.txt'
             }
         }
         stage('Checkout Code') {
             steps {
-                git branch: 'master', url: 'https://github.com/AmanPathak-DevOps/End-to-End-Kubernetes-DevSecOps-Tetris-Project.git'
+                git branch: 'master',
+                    credentialsId: 'githubkey',
+                    url: 'git@github.com:thanhnguyenle/End-to-End-Kubernetes-DevSecOps-Tetris-Project.git'
             }
         }
         stage('Update Deployment file') {
             environment {
                 GIT_REPO_NAME = "End-to-End-Kubernetes-DevSecOps-Tetris-Project"
-                GIT_USER_NAME = "AmanPathak-DevOps"
+                GIT_USER_NAME = "thanhnguyenle"
             }
             steps {
                 dir('Manifest-file') {
                     withCredentials([string(credentialsId: 'github', variable: 'GITHUB_TOKEN')]) {
                         sh '''
-                            git config user.email "aman07pathak@gmail.com"
-                            git config user.name "AmanPathak-DevOps"
+                            git config user.email "your-email@example.com"
+                            git config user.name "thanhnguyenle"
                             BUILD_NUMBER=${BUILD_NUMBER}
                             echo $BUILD_NUMBER
                             imageTag=$(grep -oP '(?<=tetrisv1:)[^ ]+' deployment-service.yml)
                             echo $imageTag
                             sed -i "s/tetrisv1:${imageTag}/tetrisv1:${BUILD_NUMBER}/" deployment-service.yml
                             git add deployment-service.yml
-                            git commit -m "Update deployment Image to version \${BUILD_NUMBER}"
+                            git commit -m "Update deployment Image to version ${BUILD_NUMBER}"
                             git push https://${GITHUB_TOKEN}@github.com/${GIT_USER_NAME}/${GIT_REPO_NAME} HEAD:master
                         '''
                     }
