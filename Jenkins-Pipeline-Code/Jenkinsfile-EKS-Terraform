@@ -1,7 +1,8 @@
 properties([
     parameters([
         string(defaultValue: 'variables.tfvars', description: 'Specify the file name', name: 'File-Name'),
-        choice(choices: ['plan', 'apply', 'destroy'], description: 'Select Terraform action', name: 'Terraform-Action')
+        choice(choices: ['plan', 'apply', 'destroy'], description: 'Select Terraform action', name: 'Terraform-Action'),
+        booleanParam(defaultValue: false, description: 'Force unlock state before running (use if state is stuck)', name: 'Force-Unlock')
     ])
 ])
 
@@ -18,55 +19,70 @@ pipeline {
         stage('Initializing Terraform') {
             steps {
                 withAWS(credentials: 'aws-key', region: 'us-east-1') {
-                dir('EKS-TF') {
-                    script {
-                        sh 'terraform init'
+                    dir('EKS-TF') {
+                        script {
+                            sh 'terraform init'
+                        }
                     }
-                }
                 }
             }
         }
         stage('Validate Terraform Code') {
             steps {
                 withAWS(credentials: 'aws-key', region: 'us-east-1') {
-                dir('EKS-TF') {
-                    script {
-                        sh 'terraform validate'
+                    dir('EKS-TF') {
+                        script {
+                            sh 'terraform validate'
+                        }
                     }
                 }
+            }
+        }
+        // ✅ New stage: safely release a stale lock when Force-Unlock is checked
+        stage('Force Unlock State') {
+            when {
+                expression { params.'Force-Unlock' == true }
+            }
+            steps {
+                withAWS(credentials: 'aws-key', region: 'us-east-1') {
+                    dir('EKS-TF') {
+                        script {
+                            sh "terraform force-unlock -force 58c4c08c-6735-fdb0-8b8a-0d81109bbc7c"
+                        }
+                    }
                 }
             }
         }
         stage('Terraform Plan') {
             steps {
                 withAWS(credentials: 'aws-key', region: 'us-east-1') {
-                dir('EKS-TF') {
-                    script {
-                        sh "terraform plan -var-file=${params.'File-Name'}"
+                    dir('EKS-TF') {
+                        script {
+                            sh "terraform plan -var-file=${params.'File-Name'}"
+                        }
                     }
-                }
                 }
             }
         }
         stage('Terraform Action') {
             steps {
                 withAWS(credentials: 'aws-key', region: 'us-east-1') {
-                script {
-                    echo "${params.'Terraform-Action'}"
-                    dir('EKS-TF') {
-                        script {
-                            if (params.'Terraform-Action' == 'plan') {
-                                sh "terraform plan -var-file=${params.'File-Name'}"
-                            } else if (params.'Terraform-Action' == 'apply') {
-                                sh "terraform apply -auto-approve -var-file=${params.'File-Name'}"
-                            } else if (params.'Terraform-Action' == 'destroy') {
-                                sh "terraform destroy -auto-approve -var-file=${params.'File-Name'}"
-                            } else {
-                                error "Invalid value for Terraform-Action: ${params.'Terraform-Action'}"
+                    script {
+                        echo "${params.'Terraform-Action'}"
+                        dir('EKS-TF') {
+                            script {
+                                if (params.'Terraform-Action' == 'plan') {
+                                    sh "terraform plan -var-file=${params.'File-Name'}"
+                                } else if (params.'Terraform-Action' == 'apply') {
+                                    sh "terraform apply -auto-approve -var-file=${params.'File-Name'}"
+                                } else if (params.'Terraform-Action' == 'destroy') {
+                                    sh "terraform destroy -auto-approve -var-file=${params.'File-Name'}"
+                                } else {
+                                    error "Invalid value for Terraform-Action: ${params.'Terraform-Action'}"
+                                }
                             }
                         }
                     }
-                }
                 }
             }
         }

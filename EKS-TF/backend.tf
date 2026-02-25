@@ -1,8 +1,9 @@
 terraform {
   backend "s3" {
-    bucket       = "amzn-s3-jenkins-server"
-    region       = "us-east-1"
-    key          = "amzn-s3-jenkins-server/terraform.tfstate"
+    bucket       = "amzn-s3-eks-server"
+    region       = "ap-southeast-1"
+    key          = "terraform.tfstate"
+    dynamodb_table ="terraform-eks-locks"
     use_lockfile = true
     encrypt      = true
   }
