@@ -2,12 +2,16 @@ properties([
     parameters([
         string(defaultValue: 'variables.tfvars', description: 'Specify the file name', name: 'File-Name'),
         choice(choices: ['plan', 'apply', 'destroy'], description: 'Select Terraform action', name: 'Terraform-Action'),
-        booleanParam(defaultValue: false, description: 'Force unlock state before running (use if state is stuck)', name: 'Force-Unlock')
+        booleanParam(defaultValue: false, description: 'Force unlock state before running (use if state is stuck)', name: 'Force-Unlock'),
+        string(defaultValue: '', description: 'State lock UUID', name: 'StateLockUUID'),
     ])
 ])
 
 pipeline {
     agent any
+    options {
+        ansiColor('xterm') // Fix color output in Jenkins console
+    }
     stages {
         stage('Checkout from Git') {
             steps {
@@ -38,7 +42,7 @@ pipeline {
                 }
             }
         }
-        // ✅ New stage: safely release a stale lock when Force-Unlock is checked
+        // release a stale lock when Force-Unlock is checked
         stage('Force Unlock State') {
             when {
                 expression { params.'Force-Unlock' == true }
@@ -47,7 +51,7 @@ pipeline {
                 withAWS(credentials: 'aws-key', region: 'us-east-1') {
                     dir('EKS-TF') {
                         script {
-                            sh "terraform force-unlock -force 58c4c08c-6735-fdb0-8b8a-0d81109bbc7c"
+                            sh "terraform force-unlock -force ${params.StateLockUUID}"
                         }
                     }
                 }
